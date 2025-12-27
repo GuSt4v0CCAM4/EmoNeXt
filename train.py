@@ -142,6 +142,7 @@ class Trainer:
 
             with torch.autocast(self.device.type, enabled=self.amp):
                 predictions, _, loss = self.model(inputs, labels)
+                preds = torch.argmax(predictions, dim=1)
 
             self.scaler.scale(loss).backward()
             if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
@@ -152,8 +153,8 @@ class Trainer:
                 self.ema.update()
                 self.scheduler.step()
 
-            batch_accuracy = (predictions == labels).sum().item() / labels.size(0)
-
+            batch_accuracy = (preds == labels).float().mean().item()
+            
             avg_loss.append(loss.item())
             avg_accuracy.append(batch_accuracy)
 
@@ -382,7 +383,6 @@ if __name__ == "__main__":
     train_transform = transforms.Compose(
         [
             transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
             transforms.Grayscale(),
             transforms.Resize(236),
             transforms.RandomRotation(degrees=20),
@@ -436,7 +436,11 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     net = get_model(len(train_dataset.classes), opt.model_size, in_22k=opt.in_22k)
-
+    
+    for name, param in net.named_parameters():
+        if "head" not in name:
+            param.requires_grad = False
+            
     Trainer(
         model=net,
         training_dataloader=train_loader,
