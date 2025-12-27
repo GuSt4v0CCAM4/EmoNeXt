@@ -142,7 +142,6 @@ class Trainer:
 
             with torch.autocast(self.device.type, enabled=self.amp):
                 predictions, _, loss = self.model(inputs, labels)
-                preds = torch.argmax(predictions, dim=1)
 
             self.scaler.scale(loss).backward()
             if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
@@ -153,7 +152,7 @@ class Trainer:
                 self.ema.update()
                 self.scheduler.step()
 
-            batch_accuracy = (preds == labels).float().mean().item()
+            batch_accuracy = (predictions == labels).float().mean().item()
             
             avg_loss.append(loss.item())
             avg_accuracy.append(batch_accuracy)
